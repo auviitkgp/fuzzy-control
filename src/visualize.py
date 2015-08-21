@@ -1,9 +1,14 @@
-import matplotlib.pyplot as plt
+### Libraries
+# Standard libraries
 import numpy as np
 
-def visualize_mf(b, inputs, output, out_final, out_activation, aggregated):
+# Third-party libraries
+import skfuzzy as fuzz
+import matplotlib.pyplot as plt
 
-    fig, (ax0, ax1, ax2,ax3) = plt.subplots(nrows=4, figsize=(8, 9))
+def visualize_mf(b, inputs):
+
+    fig, (ax0, ax1, ax2) = plt.subplots(nrows=3, figsize=(8, 5))
     ax0.plot(inputs[0], b[0][0], 'g', linewidth=1.5, label= '-ve Medium')
     ax0.plot(inputs[0], b[0][1], 'r', linewidth=1.5, label= '-ve small')
     ax0.plot(inputs[0], b[0][2], 'c', linewidth=1.5, label= 'zero')
@@ -28,40 +33,40 @@ def visualize_mf(b, inputs, output, out_final, out_activation, aggregated):
     ax2.set_title('Output')
     ax2.legend()
 
-    output0 = np.zeros_like(inputs[2])
-    ax3.fill_between(inputs[2], output0, output[0], facecolor='b', alpha=0.7)
-    ax3.plot(inputs[2], b[2][0], 'g', linewidth=0.5, linestyle='--' )
-    ax3.fill_between(inputs[2], output0, output[1], facecolor='b', alpha=0.7)
-    ax3.plot(inputs[2], b[2][1], 'r', linewidth=0.5, linestyle='--')
-    ax3.fill_between(inputs[2], output0, output[2], facecolor='b', alpha=0.7)
-    ax3.plot(inputs[2], b[2][2], 'c', linewidth=0.5, linestyle='--' )
-    ax3.fill_between(inputs[2], output0, output[3], facecolor='b', alpha=0.7)
-    ax3.plot(inputs[2], b[2][3], 'm', linewidth=0.5, linestyle='--')
-    ax3.fill_between(inputs[2], output0, output[4], facecolor='b', alpha=0.7)
-    ax3.plot(inputs[2], b[2][4], 'y', linewidth=0.5, linestyle='--')
-    ax3.set_title('Output membership activity')
-
     # Turn off top/right axes
-    for ax in (ax0, ax1, ax2, ax3):
+    for ax in (ax0, ax1, ax2):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.get_xaxis().tick_bottom()
         ax.get_yaxis().tick_left()
     plt.tight_layout()
 
-def visualize_output(b, inputs, out_final, out_activation, aggregated):
+def visualize_output(b, inputs, output, out_final, aggregated):
     # Visualize this
+    out_activation = fuzz.interp_membership(inputs[2], aggregated, out_final) # for plot
+    fig, (ax3, ax4) = plt.subplots(nrows=2, figsize=(8, 5))
     output0 = np.zeros_like(inputs[2])
-    fig, ax4 = plt.subplots(figsize=(8, 3))
+    ax3.fill_between(inputs[2], output0, output[0], facecolor='g', alpha=0.7)
+    ax3.plot(inputs[2], b[2][0], 'g', linewidth=0.5, linestyle='--' )
+    ax3.fill_between(inputs[2], output0, output[1], facecolor='r', alpha=0.7)
+    ax3.plot(inputs[2], b[2][1], 'r', linewidth=0.5, linestyle='--')
+    ax3.fill_between(inputs[2], output0, output[2], facecolor='k', alpha=0.7)
+    ax3.plot(inputs[2], b[2][2], 'c', linewidth=0.5, linestyle='--' )
+    ax3.fill_between(inputs[2], output0, output[3], facecolor='m', alpha=0.7)
+    ax3.plot(inputs[2], b[2][3], 'm', linewidth=0.5, linestyle='--')
+    ax3.fill_between(inputs[2], output0, output[4], facecolor='c', alpha=0.7)
+    ax3.plot(inputs[2], b[2][4], 'y', linewidth=0.5, linestyle='--')
+    ax3.set_title('Output membership activity')
+   
     ax4.plot(inputs[2], b[2][0], 'g', linewidth=0.5, linestyle='--', )
     ax4.plot(inputs[2], b[2][1], 'r', linewidth=0.5, linestyle='--', )
     ax4.plot(inputs[2], b[2][2], 'c', linewidth=0.5, linestyle='--', )
     ax4.plot(inputs[2], b[2][3], 'm', linewidth=0.5, linestyle='--', )
     ax4.plot(inputs[2], b[2][4], 'y', linewidth=0.5, linestyle='--', )
-    ax4.fill_between(inputs[2], output0, aggregated, facecolor='Orange', alpha=0.7)
+    ax4.fill_between(inputs[2], output0, aggregated, facecolor='g', alpha=0.7)
     ax4.plot([out_final, out_final], [0, out_activation], 'k', linewidth=1.5, alpha=0.9)
     ax4.set_title('Aggregated membership and result (line)')
-    for ax in (ax4,):
+    for ax in (ax3, ax4):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.get_xaxis().tick_bottom()

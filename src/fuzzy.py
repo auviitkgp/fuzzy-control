@@ -1,112 +1,168 @@
-import pid
-import skfuzzy as fuzz
+''' fuzzy.py
+    --------
+
+Implements fuzzy control in one degree of freedom.
+'''
+
+
+### Libraries
+# Standard libraries
 import numpy as np
+
+# Third-party libraries
+import skfuzzy as fuzz
 import matplotlib.pyplot as plt
+
+# Related libraries 
+import pid
 import visualize
 
 class Fuzzy(pid.PID):
 
-    """  Fuzzy pid contains 3 variables , 2 input variables (error and delta_e) and one output variable
-         mu - list storing type of mf for each of the variables (list of size 3)
-         d_mu - list containing details of each mf of each of the variables, i.e, say for error value of end points of each triangle. (size = 3,5,3)
-         first 3 - three variables, second 5 - five fuzzy_set variables, last 3 - 3 parameters required to define a triangle 
-         var_ranges - error, delta_e and control_output ranges not values
-         e and delta_e - input parameters(variables) required for fuzzy pid control
-         This class is compatible of receiving different mf for each variables, and receiving different no. of fuzzy_set variables for each variables and each 
-         all possible different range.
-         fuzzy_set - 
+    """ Creates an object, to provide the pid gains corresponding to a particular error and delta_error 
+        This class is compatible of receiving different type of membership function for each of the variables, and 
+        receiving different no. of fuzzy_ subsets for each io variables each 
+        with all possible different range.
+    
+        Attributes : 
+            mf_types - List of type of membership function for i/o variables in fuzzy (format - string)
+            f_ssets  - (Fuzzy subsets for each i/o variable) 3d list, each 2d list contains all the fuzzy subsets
+                         and their range of a particular i/o variable
     """
          
-    def __init__(self, mu, d_mu):
-            self.error   = 0
-            self.delta_e = 0
-            self.mu      = mu       
-            self.d_mu    = d_mu     
-            self.var_ranges = []    
+    def __init__(self, mf_types, f_ssets):
+        
+        """
+        Instance variables: 
+            error , delta_e - Input variables of fuzzy control
+            mf_types , f_ssets - Membership function and fuzzy subsets for each i/o variables
+            io_ranges - Range of io variables i.e, error, delta_e and control_output [not values] 
+        """     
+        
+        self.error    = 0
+        self.delta_e  = 0
+        self.mf_types = mf_types       
+        self.f_ssets  = f_ssets     
+        self.io_ranges = []    
         
     def run(self):
 
-            """ inputs[0] =  ERROR AXIS          ., so stores all possible error values
-                inputs[1] =  DEL_ERROR AXIS      .,     ,,
-                inputs[2] =  CONTROL_OUTPUT AXIS .,     ,,
-                    
-                ERROR                  DEL_ERROR               CONTROL_OUTPUT         m_value for crisp e and delta_e values
+        """ 
+        Finds appropriate value of pid gains
 
-                b[0][0] -ve Medium  || b[1][0] -ve Medium  ||  b[2][0] -ve Medium   ..        f[0] |  f_d[0] 
-                b[0][1] -ve small   || b[1][1] -ve small   ||  b[2][1] -ve small    ..        f[1] |  f_d[1]
-                b[0][2] zero        || b[1][2] zero        ||  b[2][2] zero         ..        f[2] |  f_d[2]
-                b[0][3] +ve small   || b[1][3] +ve small   ||  b[2][3] +ve small    ..        f[3] |  f_d[3]
-                b[0][4] +ve Medium  || b[1][4] +ve Medium  ||  b[2][4] +_ve Medium  ..        f[4] |  f_d[4] 
+        NO arguments : 
+
+        inputs : List to contain discrete values of io variables in their range (step size = 1) for plotting. i.e, x axis
+            inputs[0] =  ERROR AXIS          ., so stores all possible error values
+            inputs[1] =  DEL_ERROR AXIS      .,     ,,
+            inputs[2] =  CONTROL_OUTPUT AXIS .,     ,,
                 
-                f_mat is fuzzy fuzzy_matrix
-            """
-            inputs = [ np.arange(var[0], var[1]+1, 1) for var in self.var_ranges] #step size  = 1, third dimension of b matrix. As of now, an assumption.
-            b  = []
-            output = [0,0,0,0,0]
-            out_final = []
-            for i in range(3) :
-                    b.append( [membership_f(self.mu[i], inputs[i], a) for a in self.d_mu[i] ])
-            # To visualize the membership func. call .. [ visualize_mf(b,inputs)  ]
+        b : 3d list, each layer (i.e, 2d list) contains 1d lists of y-values (in x of step size 1) of a particular fuzzy 
+            subset of a particular i/o variable 
+        
+        muval_de, muval_e: Stores membership value of error and delta_error for each fuzzy subsets
+
+            ERROR                  DEL_ERROR               CONTROL_OUTPUT         m_value for crisp e and delta_e values
+
+            b[0][0] -ve Medium  || b[1][0] -ve Medium  ||  b[2][0] -ve Medium   ..        muval[0] |  muval_d[0] 
+            b[0][1] -ve small   || b[1][1] -ve small   ||  b[2][1] -ve small    ..        muval[1] |  muval_d[1]
+            b[0][2] zero        || b[1][2] zero        ||  b[2][2] zero         ..        muval[2] |  muval_d[2]
+            b[0][3] +ve small   || b[1][3] +ve small   ||  b[2][3] +ve small    ..        muval[3] |  muval_d[3]
+            b[0][4] +ve Medium  || b[1][4] +ve Medium  ||  b[2][4] +_ve Medium  ..        muval[4] |  muval_d[4] 
             
-            f ,f_d = error_fuzzify(inputs, b, self.error, self.delta_e)            
-            f_mat = fuzzy_matrix(f,f_d)
-            output = rule_base(b, f_mat, output)
-            print 'output : ', output
-            aggregated = np.fmax(output[0], np.fmax(output[1],np.fmax(output[2], np.fmax(output[3], output[4]))))
-            out_final = fuzz.defuzz(inputs[2], aggregated, 'centroid')
-            out_activation = fuzz.interp_membership(inputs[2], aggregated, out_final)  # for plot
-            visualize.visualize_mf(b,inputs,output, out_final, out_activation, aggregated)
-            visualize.visualize_output(b, inputs, out_final, out_activation, aggregated)
-            plt.show()
+        f_mat is a 2d matrix containing rule strengths
+        """
+        inputs = [ np.arange(var[0], var[1]+1, 1) for var in self.io_ranges]
+        b  = []
+        for i in range(3) :
+                b.append( [membership_f(self.mf_types[i], inputs[i], a) for a in self.f_ssets[i] ])
+
+        # visualize.visualize_mf(b,inputs)
+        # fuzzify Error and delta error to obtain their membership values for corr. fuzzy subsets
+        muval_e  = fuzzify(inputs[0], b[0], self.error)
+        muval_de = fuzzify(inputs[1], b[1], self.delta_e) 
+
+        # print 'muval_e:', muval_e
+        # print 'muval_de:', muval_de
+        # Obtain the rule strength matrix
+        f_mat = fuzzy_matrix(muval_e, muval_de)
+        #  obtian the y value clipped by output activation for output fuzzy subsets
+        output = rule_base(b, f_mat)
+        aggregated = np.fmax(output[0], np.fmax(output[1],np.fmax(output[2], np.fmax(output[3], output[4]))))
+        out_final  = fuzz.defuzz(inputs[2], aggregated, 'centroid')
+        print "output:",out_final
+        # plotting final output
+        visualize.visualize_output(b, inputs, output, out_final, aggregated)
+        plt.show()
 
 def membership_f(mf, x, abc = [0,0,0], a = 1, b = 2, c = 3, d = 4, abcd = [0,0,0,0]):
+    """
+    Returns y values corresponding to type of type of Membership fn.
+    arguments:
+        mf - string containing type of Membership function
+        x  - x axis values
+        abc - list containing triangular edge point x-values
+    """
+    return {
+        'trimf'   : fuzz.trimf(x, abc),                                 # trimf(x, abc)
+        'dsigmf'  : fuzz.dsigmf(x, a, b, c, d),                         # dsigmf(x, b1, c1, b2, c2)
+        'gauss2mf': fuzz.gauss2mf(x, a, b, c, d),                       # gauss2mf(x, mean1, sigma1, mean2, sigma2)
+        'gaussmf' : fuzz.gaussmf(x, a, b),                              # gaussmf(x, mean, sigma)
+        'gbellmf' : fuzz.gbellmf(x, a, b, c),                           # gbellmf(x, a, b, c)
+        'piecemf' : fuzz.piecemf(x, abc),                               # piecemf(x, abc)
+        'pimf'    : fuzz.pimf(x, a, b, c, d),                           # pimf(x, a, b, c, d)
+        'psigmf'  : fuzz.psigmf(x, a, b, c, d),                         # psigmf(x, b1, c1, b2, c2)
+        'sigmf'   : fuzz.sigmf(x, a, b),                                # sigmf(x, b, c)
+        'smf'     : fuzz.smf(x, a, b),                                  # smf(x, a, b)
+        'trapmf'  : fuzz.trapmf(x, abcd),                               # trapmf(x, abcd)
+        'zmf'     : fuzz.zmf(x, a, b),                                  # zmf(x, a, b)
+            }[mf]
 
-        return {
-            'trimf'   : fuzz.trimf(x, abc),                                 # trimf(x, abc)
-            'dsigmf'  : fuzz.dsigmf(x, a, b, c, d),                         # dsigmf(x, b1, c1, b2, c2)
-            'gauss2mf': fuzz.gauss2mf(x, a, b, c, d),                       # gauss2mf(x, mean1, sigma1, mean2, sigma2)
-            'gaussmf' : fuzz.gaussmf(x, a, b),                              # gaussmf(x, mean, sigma)
-            'gbellmf' : fuzz.gbellmf(x, a, b, c),                           # gbellmf(x, a, b, c)
-            'piecemf' : fuzz.piecemf(x, abc),                               # piecemf(x, abc)
-            'pimf'    : fuzz.pimf(x, a, b, c, d),                           # pimf(x, a, b, c, d)
-            'psigmf'  : fuzz.psigmf(x, a, b, c, d),                         # psigmf(x, b1, c1, b2, c2)
-            'sigmf'   : fuzz.sigmf(x, a, b),                                # sigmf(x, b, c)
-            'smf'     : fuzz.smf(x, a, b),                                  # smf(x, a, b)
-            'trapmf'  : fuzz.trapmf(x, abcd),                               # trapmf(x, abcd)
-            'zmf'     : fuzz.zmf(x, a, b),                                  # zmf(x, a, b)
-                }[mf]
+def fuzzify(Input, y, crisp_val):
+    """
+    Fuzzifies crisp value to obtain their membership values for corr. fuzzy subsets.
+    arguments:
+        Input - Range of crisp_val i.e, list of x values discrete values which crisp_val can take
+        y     - 2d list containing y values of each fuzzy subsets of an i/o variable
+        crisp_val - value to be fuzzified
+    """
+    f = [fuzz.interp_membership(Input, fuzzy_sset_y, crisp_val) for fuzzy_sset_y in y ]
+    return f
 
-def error_fuzzify(inputs, b, error, delta_e):
-    f   = [fuzz.interp_membership(inputs[0], fuzzy_set, error) for fuzzy_set in b[0]] #f : mu-value corresponding to error on fuzzy set.
-    f_d = [fuzz.interp_membership(inputs[1], fuzzy_set, delta_e) for fuzzy_set in b[1]]# f_d : mu-value corresponding to delta_e on fuzzy set.
-    return (f, f_d)
-
-def fuzzy_matrix(f, f_d): #fuzzy_matrix function returns array of rule strengths
-    print "f:",f
-    print "f_d:",f_d
-    return np.array([ [min(a,b) for a in f] for b in f_d])
+def fuzzy_matrix(muval_e, muval_de): 
+    """
+    Returns 2d array of rule strengths
+    arguments:
+        muval_e, muval_de - 1d list of membership values to their corresponding fuzzy subsets
+    """
+    return np.array([ [min(a,b) for a in muval_e] for b in muval_de])
 
 #b= y-values of trimf corresponding to each input and output variables in range var.ranges[]
-def rule_base(b, f_mat, output):
+def rule_base(b, f_mat):
     """
-    ERROR/ DEL_ERROR | -ve Medium              ||  -ve small              ||        zero               ||   +ve small              ||    +ve Medium         
-                    ------------------------------------------------------------------------------------------------------------------------------------------                      
-      -ve Medium     | f_mat[0][0] -ve Medium  || f_mat[1][0] -ve Medium  ||  f_mat[2][0] -ve Medium   || f_mat[3][0] -ve Medium   || f_mat[4][0] -ve Medium   
-      -ve small      | f_mat[0][1] -ve small   || f_mat[1][1] -ve small   ||  f_mat[2][1] -ve small    || f_mat[3][1] -ve small    || f_mat[4][1] -ve small    
-      zero           | f_mat[0][2] zero        || f_mat[1][2] zero        ||  f_mat[2][2] zero         || f_mat[3][2] zero         || f_mat[4][2] zero         
-      +ve small      | f_mat[0][3] +ve small   || f_mat[1][3] +ve small   ||  f_mat[2][3] +ve small    || f_mat[3][3] +ve small    || f_mat[4][3] +ve small    
-      +ve Medium     | f_mat[0][4] +ve Medium  || f_mat[1][4] +ve Medium  ||  f_mat[2][4] +_ve Medium  || f_mat[3][4] +_ve Medium  || f_mat[4][4] +_ve Medium 
+    Returns y values of output by clipping by an amount of output activations for output fuzzy subsets
+    arguments:
+    f_mat - rule_strength matrix
+    b     - b[2] , y values of output fuzzy subsets
+
+E / DEL_E|         NM      ||       NS        ||        Z         ||       PS        ||       PM         
+----------------------------------------------------------------------------------------------------------
+    NM   | f_mat[0][0] NM  || f_mat[0][1] NM  ||  f_mat[0][2] NS  || f_mat[0][3] Z   || f_mat[0][4] PS   
+    NS   | f_mat[1][0] NM  || f_mat[1][1] NM  ||  f_mat[1][2] NS  || f_mat[1][3] PS  || f_mat[1][4] PM  
+    Z    | f_mat[2][0] NM  || f_mat[2][1] NS  ||  f_mat[2][2] Z   || f_mat[2][3] PS  || f_mat[2][4] PM         
+    PS   | f_mat[3][0] NM  || f_mat[3][1] NS  ||  f_mat[3][2] PS  || f_mat[3][3] PM  || f_mat[3][4] PM   
+    PM   | f_mat[4][0] NS  || f_mat[4][1] Z   ||  f_mat[4][2] PS  || f_mat[4][3] PM  || f_mat[4][4] PM
 
     """
-    control_Nmed   = max(f_mat[0][0], f_mat[0][1], f_mat[1][0], f_mat[1][1], f_mat[2][0], f_mat[3][0])
-    output[0] = np.fmin(control_Nmed,b[2][0])
-    control_Nsmall = max(f_mat[0][2], f_mat[1][2], f_mat[2][2], f_mat[3][2], f_mat[4][0])
-    output[1] = np.fmin(control_Nsmall, b[2][1])
-    control_zero   = max(f_mat[0][3], f_mat[2][2], f_mat[4][1])
-    output[2] = np.fmin(control_zero, b[2][2])
-    control_Psmall = max(f_mat[0][4], f_mat[1][3], f_mat[2][3], f_mat[3][2], f_mat[4][2])
-    output[3] = np.fmin(control_Psmall, b[2][3])
-    control_Pmed   = max(f_mat[1][4], f_mat[2][4], f_mat[3][4], f_mat[3][3], f_mat[4][3], f_mat[4][4])
-    output[4] = np.fmin(control_Pmed, b[2][4])
-    
-    return output
+    NM = max(f_mat[0][0], f_mat[0][1], f_mat[1][0], f_mat[1][1], f_mat[2][0], f_mat[3][0])
+    b[2][0] = np.fmin(NM,b[2][0])
+    NS = max(f_mat[0][2], f_mat[1][2], f_mat[2][1], f_mat[3][1], f_mat[4][0])
+    b[2][1] = np.fmin(NS, b[2][1])
+    Z  = max(f_mat[0][3], f_mat[2][2], f_mat[4][1])
+    b[2][2] = np.fmin(Z, b[2][2])
+    PS = max(f_mat[0][4], f_mat[1][3], f_mat[2][3], f_mat[3][2], f_mat[4][2])
+    b[2][3] = np.fmin(PS, b[2][3])
+    PM = max(f_mat[1][4], f_mat[2][4], f_mat[3][4], f_mat[3][3], f_mat[4][3], f_mat[4][4])
+    b[2][4] = np.fmin(PM, b[2][4])
+
+    return b[2]

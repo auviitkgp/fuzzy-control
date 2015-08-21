@@ -1,6 +1,6 @@
 import fuzzy
 
-d_mf = [ [ # error
+f_ssets = [ [ # error
           [-10,-10,-5],  # -ve medium   
           [-10,-5 , 0],  # -ve small
           [-5 , 0 , 5],  # zero
@@ -25,22 +25,21 @@ d_mf = [ [ # error
          ]                 
       ] 
 
-bong = [ # range of e
-        [-10,10],
-         # range of d_e
-        [-10,10],
-         # range of u
-        [-10,10]
-       ]
+io_ranges = [ # range of e
+              [-10,10],
+               # range of d_e
+              [-10,10],
+               # range of u
+              [-10,10]
+            ]
 
-mf = ['trimf','trimf','trimf']
+mf_types = ['trimf','trimf','trimf']
 
 def main():
-  x = fuzzy.Fuzzy(mf, d_mf)
-  x.target = 5
-  x.error = -4
-  x.delta_e = -10 
-  x.var_ranges = bong
+  x = fuzzy.Fuzzy(mf_types, f_ssets)
+  x.error = 7.5
+  x.delta_e = 5 
+  x.io_ranges = io_ranges
   x.run() 
 
 if __name__ == '__main__':
