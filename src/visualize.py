@@ -40,6 +40,7 @@ def visualize_mf(b, inputs):
         ax.get_xaxis().tick_bottom()
         ax.get_yaxis().tick_left()
     plt.tight_layout()
+    plt.show()
 
 def visualize_output(b, inputs, output, out_final, aggregated):
     # Visualize this
